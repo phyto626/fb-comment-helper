@@ -186,10 +186,14 @@ async function fetchAllComments(url) {
 
     if (data.data && data.data.length > 0) {
         data.data.forEach(c => {
+            // Facebook v2.0+ hides 'from' if using User Token on a Page Post
+            const userName = c.from ? c.from.name : '隱私設定使用者 (Unknown)';
+            const userId = c.from ? c.from.id : (c.id ? c.id.split('_')[0] : 'unknown_' + Math.random());
+
             rawComments.push({
                 id: c.id,
-                name: c.from ? c.from.name : 'Unknown User',
-                userId: c.from ? c.from.id : 'unknown_' + Math.random(),
+                name: userName,
+                userId: userId,
                 message: c.message || '',
                 created_time: c.created_time
             });
@@ -197,8 +201,7 @@ async function fetchAllComments(url) {
     }
 
     if (data.paging && data.paging.next) {
-        UI.fetchStatus.textContent = `🔍 抓取中... 已取得 ${rawComments.length} 筆`;
-        // The FB API returns a full URL in data.paging.next
+        UI.fetchStatus.textContent = `🔍 抓取中... 已取得 ${rawComments.length} 筆 (若姓名顯示不全請更換專頁權杖)`;
         await fetchAllComments(data.paging.next);
     }
 }
