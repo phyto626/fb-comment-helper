@@ -362,18 +362,19 @@ function renderWinners(winners) {
     UI.resultsSection.style.display = 'block';
     UI.winnersContainer.innerHTML = '';
 
-    // Create copy button if not exists
-    if (!document.getElementById('btnCopyWinners')) {
-        const copyBtn = document.createElement('button');
+    // Create copy button if not exists, always update onclick to latest winners
+    let copyBtn = document.getElementById('btnCopyWinners');
+    if (!copyBtn) {
+        copyBtn = document.createElement('button');
         copyBtn.id = 'btnCopyWinners';
         copyBtn.className = 'btn btn-secondary mt-2';
         copyBtn.innerHTML = '📋 複製名單內容';
-        UI.resultsSection.querySelector('#resultsActions').appendChild(copyBtn);
-        copyBtn.onclick = () => {
-            const text = winners.map((w, i) => `${i + 1}. ${w.name}: ${w.message}`).join('\n');
-            navigator.clipboard.writeText(text).then(() => alert('✅ 已複製到剪貼簿！'));
-        };
+        document.getElementById('resultsActions').appendChild(copyBtn);
     }
+    copyBtn.onclick = () => {
+        const text = winners.map((w, i) => `${i + 1}. ${w.name}: ${w.message}`).join('\n');
+        navigator.clipboard.writeText(text).then(() => alert('✅ 已複製到剪貼簿！'));
+    };
 
     winners.forEach((w, index) => {
         const initial = w.name.charAt(0).toUpperCase();
