@@ -135,7 +135,31 @@ UI.btnFetchData.addEventListener('click', async () => {
     rawComments = [];
 
     try {
-        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?limit=100&access_token=${token}`;
+        let finalToken = token;
+
+        // Auto-negotiate Page Access Token if it's a page post (contains an underscore)
+        if (actualPostId.includes('_')) {
+            const pageId = actualPostId.split('_')[0];
+            UI.fetchStatus.textContent = "🔐 正在嘗試取得粉絲專頁授權...";
+            try {
+                const accountsUrl = `https://graph.facebook.com/v25.0/me/accounts?access_token=${token}`;
+                const accRes = await fetch(accountsUrl);
+                const accData = await accRes.json();
+
+                if (accData.data) {
+                    const targetPage = accData.data.find(p => p.id === pageId);
+                    if (targetPage && targetPage.access_token) {
+                        finalToken = targetPage.access_token;
+                        UI.fetchStatus.textContent = `🔑 已自動切換為專頁權杖 (${targetPage.name})`;
+                        console.log("Switched to Page Access Token:", targetPage.name);
+                    }
+                }
+            } catch (authErr) {
+                console.warn("Failed to auto-fetch page token, continuing with user token:", authErr);
+            }
+        }
+
+        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?limit=100&access_token=${finalToken}`;
         await fetchAllComments(initialUrl);
         UI.fetchStatus.textContent = `✅ 抓取完成！共取得 ${rawComments.length} 筆留言。`;
         UI.fetchStatus.style.color = "var(--secondary)";
