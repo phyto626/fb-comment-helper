@@ -36,7 +36,7 @@ window.fbAsyncInit = function () {
         appId: FB_APP_ID,
         cookie: true,
         xfbml: true,
-        version: 'v19.0'
+        version: 'v25.0'
     });
 
     console.log("FB SDK Initialized.");
@@ -135,7 +135,7 @@ UI.btnFetchData.addEventListener('click', async () => {
     rawComments = [];
 
     try {
-        const initialUrl = `https://graph.facebook.com/v19.0/${actualPostId}/comments?limit=100&access_token=${token}`;
+        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?limit=100&access_token=${token}`;
         await fetchAllComments(initialUrl);
         UI.fetchStatus.textContent = `✅ 抓取完成！共取得 ${rawComments.length} 筆留言。`;
         UI.fetchStatus.style.color = "var(--secondary)";
@@ -150,7 +150,9 @@ UI.btnFetchData.addEventListener('click', async () => {
 });
 
 async function fetchAllComments(url) {
-    const res = await fetch(url);
+    // Ensure the URL uses v25.0 if it's a relative path (though paging.next is usually absolute)
+    const finalUrl = url.includes('graph.facebook.com') ? url : `https://graph.facebook.com/v25.0/${url}`;
+    const res = await fetch(finalUrl);
     const data = await res.json();
 
     if (data.error) {
