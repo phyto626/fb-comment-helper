@@ -94,43 +94,62 @@ UI.btnRedraw.addEventListener('click', doDraw);
 
 // Fetch Real Data from FB Graph API
 UI.btnFetchData.addEventListener('click', async () => {
-    const pId = UI.postId.value.trim();
+    let pIdInput = UI.postId.value.trim();
     const token = UI.accessToken.value.trim();
 
-    // Fallback: extracting post ID from URL if user pastes a full URL
-    let actualPostId = pId;
-    if (pId.includes('facebook.com') || pId.includes('fb.watch')) {
-        const matches = pId.match(/(\d{10,})/g);
-        if (matches && matches.length > 0) {
-            actualPostId = matches[matches.length - 1]; // Assume the last long number is post id
-            UI.postId.value = actualPostId;
+    // Improved extraction: Support for PAGEID_POSTID and URL formats
+    let actualPostId = '';
+
+    // Pattern 1: {PAGE_ID}_{POST_ID} format
+    if (/^\d+_\d+$/.test(pIdInput)) {
+        actualPostId = pIdInput;
+    }
+    // Pattern 2: URL parsing
+    else if (pIdInput.includes('facebook.com') || pIdInput.includes('fb.watch')) {
+        // Try to find the PAGEID_POSTID pattern in URL or just IDs
+        const urlParts = pIdInput.split('/');
+        if (pIdInput.includes('posts/')) {
+            actualPostId = urlParts[urlParts.indexOf('posts') + 1].split('?')[0].split('#')[0];
+        } else if (pIdInput.includes('videos/')) {
+            actualPostId = urlParts[urlParts.indexOf('videos') + 1].split('?')[0].split('#')[0];
+        } else {
+            const matches = pIdInput.match(/(\d{10,})/g);
+            if (matches && matches.length >= 2) {
+                // Common for Page posts: pageId_postId
+                actualPostId = `${matches[0]}_${matches[1]}`;
+            } else if (matches) {
+                actualPostId = matches[matches.length - 1];
+            }
         }
+    } else {
+        actualPostId = pIdInput;
     }
 
-    if (!actualPostId) return alert('請輸入 Facebook 貼文 ID');
+    if (!actualPostId) return alert('請輸入有效的 Facebook 貼文 ID (建議格式: PAGEID_POSTID) 或貼文網址');
     if (!token) return alert('請輸入 Access Token');
 
+    UI.postId.value = actualPostId;
     UI.btnFetchData.disabled = true;
     UI.fetchStatus.textContent = "🔍 正在抓取留言中... (請耐心等候)";
     UI.fetchStatus.style.color = "var(--text-main)";
     rawComments = [];
 
     try {
-        await fetchAllComments(actualPostId, token, `${actualPostId}/comments?limit=100&access_token=${token}`);
+        const initialUrl = `https://graph.facebook.com/v19.0/${actualPostId}/comments?limit=100&access_token=${token}`;
+        await fetchAllComments(initialUrl);
         UI.fetchStatus.textContent = `✅ 抓取完成！共取得 ${rawComments.length} 筆留言。`;
         UI.fetchStatus.style.color = "var(--secondary)";
         updateEligible();
     } catch (e) {
         UI.fetchStatus.textContent = "❌ 抓取失敗：" + e.message;
         UI.fetchStatus.style.color = "var(--danger)";
-        console.error(e);
+        console.error("Fetch Error Detail:", e);
     } finally {
         UI.btnFetchData.disabled = false;
     }
 });
 
-async function fetchAllComments(pId, token, endpoint) {
-    const url = `https://graph.facebook.com/v19.0/${endpoint}`;
+async function fetchAllComments(url) {
     const res = await fetch(url);
     const data = await res.json();
 
@@ -152,10 +171,8 @@ async function fetchAllComments(pId, token, endpoint) {
 
     if (data.paging && data.paging.next) {
         UI.fetchStatus.textContent = `🔍 抓取中... 已取得 ${rawComments.length} 筆`;
-        // recursively fetch next page
-        const nextUrl = new URL(data.paging.next);
-        const searchParms = new URLSearchParams(nextUrl.search);
-        await fetchAllComments(pId, token, `${pId}/comments?${searchParms.toString()}`);
+        // The FB API returns a full URL in data.paging.next
+        await fetchAllComments(data.paging.next);
     }
 }
 
