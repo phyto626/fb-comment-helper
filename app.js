@@ -18,7 +18,8 @@ const UI = {
     btnDraw: document.getElementById('btnDraw'),
     resultsSection: document.getElementById('resultsSection'),
     winnersContainer: document.getElementById('winnersContainer'),
-    btnRedraw: document.getElementById('btnRedraw')
+    btnRedraw: document.getElementById('btnRedraw'),
+    btnCopyWinners: null // will create dynamically
 };
 
 let rawComments = [];
@@ -159,7 +160,7 @@ UI.btnFetchData.addEventListener('click', async () => {
             }
         }
 
-        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?limit=100&access_token=${finalToken}`;
+        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?fields=id,message,from,created_time&limit=100&access_token=${finalToken}`;
         await fetchAllComments(initialUrl);
         UI.fetchStatus.textContent = `✅ 抓取完成！共取得 ${rawComments.length} 筆留言。`;
         UI.fetchStatus.style.color = "var(--secondary)";
@@ -314,6 +315,19 @@ function doDraw() {
 function renderWinners(winners) {
     UI.resultsSection.style.display = 'block';
     UI.winnersContainer.innerHTML = '';
+
+    // Create copy button if not exists
+    if (!document.getElementById('btnCopyWinners')) {
+        const copyBtn = document.createElement('button');
+        copyBtn.id = 'btnCopyWinners';
+        copyBtn.className = 'btn btn-secondary mt-2';
+        copyBtn.innerHTML = '📋 複製名單內容';
+        UI.resultsSection.querySelector('#resultsActions').appendChild(copyBtn);
+        copyBtn.onclick = () => {
+            const text = winners.map((w, i) => `${i + 1}. ${w.name}: ${w.message}`).join('\n');
+            navigator.clipboard.writeText(text).then(() => alert('✅ 已複製到剪貼簿！'));
+        };
+    }
 
     winners.forEach((w, index) => {
         const initial = w.name.charAt(0).toUpperCase();
