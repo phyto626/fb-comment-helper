@@ -437,6 +437,9 @@ input:checked+.slider:before {
     animation: slideUpFade 0.5s ease forwards;
     opacity: 0;
     transform: translateY(20px);
+    height: 100%;
+    /* Ensure equal height in grid */
+    min-height: 200px;
 }
 
 .winner-header {
@@ -444,6 +447,7 @@ input:checked+.slider:before {
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 0.75rem;
+    flex-shrink: 0;
 }
 
 .winner-avatar {
@@ -458,13 +462,16 @@ input:checked+.slider:before {
     font-size: 1.2rem;
     color: white;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .winner-name {
     font-weight: 600;
     font-size: 1.1rem;
     color: white;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: normal;
+    line-height: 1.2;
 }
 
 .winner-comment {
@@ -474,8 +481,11 @@ input:checked+.slider:before {
     padding: 0.85rem;
     border-radius: 8px;
     flex-grow: 1;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: normal;
     line-height: 1.5;
+    white-space: pre-wrap;
+    /* Preserve line breaks if any */
 }
 
 @keyframes slideUpFade {
