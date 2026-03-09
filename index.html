@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facebook 留言抽籤小助手</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    
+    <div class="container">
+        <header>
+            <h1><span class="icon">🎁</span> Facebook 留言抽籤小助手</h1>
+            <p>輕鬆匯入貼文留言，設定條件並抽出幸運得獎者。</p>
+        </header>
+
+        <main class="grid-layout">
+            <!-- Data Source Card -->
+            <section class="card glass-panel">
+                <h2>1. 資料來源</h2>
+                
+                <div class="fb-auth-section mb-4">
+                    <p class="helper-text mb-2">使用您的 Facebook 帳號登入授權，或直接載入測試資料：</p>
+                    <button id="btnFbLogin" class="btn btn-outline" style="display: none;">
+                        <svg viewBox="0 0 24 24" class="fb-icon" width="20" height="20" style="margin-right: 8px; fill: white;">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        Facebook 授權登入
+                    </button>
+                    <div id="fbStatus" class="status-msg mt-2"></div>
+                </div>
+
+                <div class="form-group mt-4">
+                    <label for="postId">Facebook 貼文 ID</label>
+                    <input type="text" id="postId" placeholder="例如: 1015949526... 或完整貼文網址">
+                </div>
+                <!-- Token input could be hidden or auto-filled if logged in -->
+                <div class="form-group mb-4">
+                    <label for="accessToken">Access Token (選填，若已授權則自動填入)</label>
+                    <input type="password" id="accessToken" placeholder="輸入 Page 或 User Access Token">
+                </div>
+
+                <div class="button-group mt-4">
+                    <button id="btnFetchData" class="btn btn-primary">獲取留言</button>
+                    <button id="btnLoadMock" class="btn btn-secondary">載入測試資料</button>
+                </div>
+
+                <div id="fetchStatus" class="fetch-status">
+                    <!-- Progress / count will be shown here -->
+                </div>
+            </section>
+
+            <!-- Filter Settings Card -->
+            <section class="card glass-panel" id="filterSection">
+                <h2>2. 篩選與抽獎設定</h2>
+                
+                <div class="settings-grid">
+                    <div class="setting-item checkbox-wrapper">
+                        <label class="toggle">
+                            <input type="checkbox" id="chkUnique" checked>
+                            <span class="slider"></span>
+                        </label>
+                        <span class="setting-label">過濾重複留言 (每人限一次)</span>
+                    </div>
+
+                    <div class="setting-item form-group">
+                        <label for="keywordFilter">必須包含關鍵字 (選填)</label>
+                        <input type="text" id="keywordFilter" placeholder="例如: 抽獎、讚">
+                    </div>
+                    
+                    <div class="setting-item form-group">
+                        <label for="tagCountFilter">必須 @tag 幾個人</label>
+                        <input type="number" id="tagCountFilter" min="0" value="0">
+                    </div>
+
+                    <div class="setting-item form-group">
+                        <label for="drawCount">抽獎人數</label>
+                        <input type="number" id="drawCount" min="1" value="1" class="lg-input">
+                    </div>
+                </div>
+
+                <div class="stats-box mt-4">
+                    <div class="stat">
+                        <span class="stat-label">載入留言總數</span>
+                        <span class="stat-value" id="totalComments">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">符合資格人數</span>
+                        <span class="stat-value highlight" id="eligibleComments">0</span>
+                    </div>
+                </div>
+
+                <button id="btnDraw" class="btn btn-accent btn-large w-100 mt-4" disabled>
+                    🎉 開始抽獎
+                </button>
+            </section>
+
+            <!-- Results Section -->
+            <section class="card glass-panel full-width" id="resultsSection" style="display: none;">
+                <h2>🎊 抽籤結果 🎊</h2>
+                <div class="winners-grid" id="winnersContainer">
+                    <!-- Winner cards injected here -->
+                </div>
+                <div class="actions center mt-4" id="resultsActions">
+                    <button id="btnRedraw" class="btn btn-outline" style="min-width: 200px;">重新抽獎</button>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>免責聲明：此工具僅供學術/測試用途，請遵守 Facebook Platform Policy。</p>
+        </footer>
+    </div>
+
+    <!-- Required for FB SDK -->
+    <div id="fb-root"></div>
+    <script src="app.js"></script>
+</body>
+</html>
