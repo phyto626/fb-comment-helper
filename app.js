@@ -19,7 +19,8 @@ const UI = {
     resultsSection: document.getElementById('resultsSection'),
     winnersContainer: document.getElementById('winnersContainer'),
     btnRedraw: document.getElementById('btnRedraw'),
-    btnCopyWinners: null // will create dynamically
+    btnCopyWinners: null, // will create dynamically
+    csvFile: document.getElementById('csvFile')
 };
 
 let rawComments = [];
@@ -80,6 +81,51 @@ UI.btnFbLogin.addEventListener('click', () => {
     }, { scope: 'public_profile,email' });
 });
 
+// ... existing code ...
+
+// CSV File Upload Logic
+UI.csvFile.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    UI.fetchStatus.textContent = "📂 正在讀取 CSV 檔案...";
+    UI.fetchStatus.style.color = "var(--text-main)";
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const content = event.target.result;
+            const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
+
+            rawComments = [];
+            lines.forEach((line, index) => {
+                // Basic CSV parsing: split by comma but handle simple cases
+                // For a more robust solution one might use a library like PapaParse, 
+                // but for a single-file helper, regex split is usually enough.
+                const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                const name = (parts[0] || `不知名用戶_${index}`).replace(/^"|"$/g, '').trim();
+                const message = (parts[1] || '').replace(/^"|"$/g, '').trim();
+
+                rawComments.push({
+                    id: 'csv_' + index,
+                    name: name,
+                    userId: 'csv_uid_' + name,
+                    message: message,
+                    created_time: new Date().toISOString()
+                });
+            });
+
+            UI.fetchStatus.textContent = `✅ CSV 匯入成功！共取得 ${rawComments.length} 筆資料。`;
+            UI.fetchStatus.style.color = "var(--secondary)";
+            updateEligible();
+        } catch (err) {
+            UI.fetchStatus.textContent = "❌ CSV 解析失敗：" + err.message;
+            UI.fetchStatus.style.color = "var(--danger)";
+        }
+    };
+    reader.readAsText(file);
+});
+
 // Update eligible count when filters change
 UI.chkUnique.addEventListener('change', updateEligible);
 UI.keywordFilter.addEventListener('input', updateEligible);
@@ -98,28 +144,32 @@ UI.btnFetchData.addEventListener('click', async () => {
     let pIdInput = UI.postId.value.trim();
     const token = UI.accessToken.value.trim();
 
-    // Improved extraction: Support for PAGEID_POSTID and URL formats
+    // Improved extraction: Support for PAGEID_POSTID, URL formats, and permalinks
     let actualPostId = '';
 
-    // Pattern 1: {PAGE_ID}_{POST_ID} format
     if (/^\d+_\d+$/.test(pIdInput)) {
         actualPostId = pIdInput;
-    }
-    // Pattern 2: URL parsing
-    else if (pIdInput.includes('facebook.com') || pIdInput.includes('fb.watch')) {
-        // Try to find the PAGEID_POSTID pattern in URL or just IDs
-        const urlParts = pIdInput.split('/');
-        if (pIdInput.includes('posts/')) {
-            actualPostId = urlParts[urlParts.indexOf('posts') + 1].split('?')[0].split('#')[0];
-        } else if (pIdInput.includes('videos/')) {
-            actualPostId = urlParts[urlParts.indexOf('videos') + 1].split('?')[0].split('#')[0];
+    } else if (pIdInput.includes('facebook.com') || pIdInput.includes('fb.watch')) {
+        // Try to find story_fbid/id pair for permalink URLs
+        const urlObj = new URL(pIdInput.includes('http') ? pIdInput : 'https://' + pIdInput);
+        const storyFbid = urlObj.searchParams.get('story_fbid');
+        const idParam = urlObj.searchParams.get('id');
+
+        if (storyFbid && idParam) {
+            actualPostId = `${idParam}_${storyFbid}`;
         } else {
-            const matches = pIdInput.match(/(\d{10,})/g);
-            if (matches && matches.length >= 2) {
-                // Common for Page posts: pageId_postId
-                actualPostId = `${matches[0]}_${matches[1]}`;
-            } else if (matches) {
-                actualPostId = matches[matches.length - 1];
+            const urlParts = pIdInput.split('/');
+            if (pIdInput.includes('posts/')) {
+                actualPostId = urlParts[urlParts.indexOf('posts') + 1].split('?')[0].split('#')[0];
+            } else if (pIdInput.includes('videos/')) {
+                actualPostId = urlParts[urlParts.indexOf('videos') + 1].split('?')[0].split('#')[0];
+            } else {
+                const matches = pIdInput.match(/(\d{10,})/g);
+                if (matches && matches.length >= 2) {
+                    actualPostId = `${matches[0]}_${matches[1]}`;
+                } else if (matches) {
+                    actualPostId = matches[matches.length - 1];
+                }
             }
         }
     } else {
@@ -131,7 +181,7 @@ UI.btnFetchData.addEventListener('click', async () => {
 
     UI.postId.value = actualPostId;
     UI.btnFetchData.disabled = true;
-    UI.fetchStatus.textContent = "🔍 正在抓取留言中... (請耐心等候)";
+    UI.fetchStatus.textContent = "🔍 正在準備抓取...";
     UI.fetchStatus.style.color = "var(--text-main)";
     rawComments = [];
 
@@ -141,9 +191,9 @@ UI.btnFetchData.addEventListener('click', async () => {
         // Auto-negotiate Page Access Token if it's a page post (contains an underscore)
         if (actualPostId.includes('_')) {
             const pageId = actualPostId.split('_')[0];
-            UI.fetchStatus.textContent = "🔐 正在嘗試取得粉絲專頁授權...";
+            UI.fetchStatus.textContent = "🔐 檢查粉專授權中...";
             try {
-                const accountsUrl = `https://graph.facebook.com/v25.0/me/accounts?access_token=${token}`;
+                const accountsUrl = `https://graph.facebook.com/v25.0/me/accounts?fields=id,name,access_token&access_token=${token}`;
                 const accRes = await fetch(accountsUrl);
                 const accData = await accRes.json();
 
@@ -152,16 +202,39 @@ UI.btnFetchData.addEventListener('click', async () => {
                     if (targetPage && targetPage.access_token) {
                         finalToken = targetPage.access_token;
                         UI.fetchStatus.textContent = `🔑 已自動切換為專頁權杖 (${targetPage.name})`;
-                        console.log("Switched to Page Access Token:", targetPage.name);
                     }
                 }
             } catch (authErr) {
-                console.warn("Failed to auto-fetch page token, continuing with user token:", authErr);
+                console.warn("Auto-fetch page token skipped:", authErr);
             }
         }
 
-        const initialUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?fields=id,message,from,created_time&limit=100&access_token=${finalToken}`;
-        await fetchAllComments(initialUrl);
+        let nextUrl = `https://graph.facebook.com/v25.0/${actualPostId}/comments?fields=id,message,from,created_time&limit=100&access_token=${finalToken}`;
+
+        while (nextUrl) {
+            UI.fetchStatus.textContent = `🔍 抓取中... 已取得 ${rawComments.length} 筆`;
+            const res = await fetch(nextUrl);
+            const data = await res.json();
+
+            if (data.error) throw new Error(data.error.message);
+
+            if (data.data && data.data.length > 0) {
+                data.data.forEach(c => {
+                    const userName = c.from ? c.from.name : '隱私設定使用者 (Unknown)';
+                    const userId = c.from ? c.from.id : (c.id ? c.id.split('_')[0] : 'uid_' + Math.random());
+                    rawComments.push({
+                        id: c.id,
+                        name: userName,
+                        userId: userId,
+                        message: c.message || '',
+                        created_time: c.created_time
+                    });
+                });
+            }
+
+            nextUrl = (data.paging && data.paging.next) ? data.paging.next : null;
+        }
+
         UI.fetchStatus.textContent = `✅ 抓取完成！共取得 ${rawComments.length} 筆留言。`;
         UI.fetchStatus.style.color = "var(--secondary)";
         updateEligible();
@@ -174,37 +247,7 @@ UI.btnFetchData.addEventListener('click', async () => {
     }
 });
 
-async function fetchAllComments(url) {
-    // Ensure the URL uses v25.0 if it's a relative path (though paging.next is usually absolute)
-    const finalUrl = url.includes('graph.facebook.com') ? url : `https://graph.facebook.com/v25.0/${url}`;
-    const res = await fetch(finalUrl);
-    const data = await res.json();
-
-    if (data.error) {
-        throw new Error(data.error.message);
-    }
-
-    if (data.data && data.data.length > 0) {
-        data.data.forEach(c => {
-            // Facebook v2.0+ hides 'from' if using User Token on a Page Post
-            const userName = c.from ? c.from.name : '隱私設定使用者 (Unknown)';
-            const userId = c.from ? c.from.id : (c.id ? c.id.split('_')[0] : 'unknown_' + Math.random());
-
-            rawComments.push({
-                id: c.id,
-                name: userName,
-                userId: userId,
-                message: c.message || '',
-                created_time: c.created_time
-            });
-        });
-    }
-
-    if (data.paging && data.paging.next) {
-        UI.fetchStatus.textContent = `🔍 抓取中... 已取得 ${rawComments.length} 筆 (若姓名顯示不全請更換專頁權杖)`;
-        await fetchAllComments(data.paging.next);
-    }
-}
+// Removed fetchAllComments recursive function in favor of iterative loop in btnFetchData event listener
 
 // Load Mock Data
 UI.btnLoadMock.addEventListener('click', () => {
